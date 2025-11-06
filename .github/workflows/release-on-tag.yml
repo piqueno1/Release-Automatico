@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v*'   # roda quando uma tag começando com v for pushada
+permissions:
+  contents: write
 
 jobs:
   build-and-release:
