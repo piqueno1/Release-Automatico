@@ -9,7 +9,7 @@ on:
         default: 'v1.0.0'
 
 permissions:
-  contents: write   # permite criar releases e enviar assets
+  contents: write   # permite criar/atualizar releases e enviar assets
 
 jobs:
   release:
@@ -19,9 +19,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # pega o histórico completo (necessário para tags)
+          fetch-depth: 0
 
-      # 🔹 Cria a tag automaticamente se ela ainda não existir
       - name: Create tag if not exists
         run: |
           TAG="${{ github.event.inputs.version }}"
@@ -36,7 +35,6 @@ jobs:
             echo "✅ Tag ${TAG} já existe."
           fi
 
-      # 🔹 Cria o pacote zip do repositório completo (sem .git e .github)
       - name: Create release zip
         id: make_zip
         run: |
@@ -47,23 +45,15 @@ jobs:
           echo "ZIP=${ZIPNAME}" >> $GITHUB_OUTPUT
           ls -lh "${ZIPNAME}"
 
-      # 🔹 Cria o release no GitHub
-      - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
-        with:
-          tag_name: ${{ github.event.inputs.version }}
-          release_name: "Release ${{ github.event.inputs.version }}"
-          body: "Release automático contendo o pacote completo do repositório (${{ github.event.inputs.version }})."
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # 🔹 Envia o arquivo zip como asset do release
-      - name: Upload full repo zip
+      - name: Create or update release and upload asset
         uses: softprops/action-gh-release@v1
         with:
+          # Tag a ser usada (cria release se não existir, atualiza se existir)
+          tag_name: ${{ github.event.inputs.version }}
+          name: "Release ${{ github.event.inputs.version }}"
+          body: "Release automático contendo o pacote completo do repositório (${{
+            github.event.inputs.version }})."
           files: repo-${{ github.event.inputs.version }}.zip
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
