@@ -4,8 +4,9 @@ on:
   push:
     tags:
       - 'v*'   # roda quando uma tag começando com v for pushada
+
 permissions:
-  contents: write
+  contents: write   # permite criar releases e subir assets
 
 jobs:
   build-and-release:
@@ -14,13 +15,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Create release zip
         id: make_zip
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
           ZIPNAME="release-${TAG}.zip"
-          # cria zip ignorando pasta .git e node_modules (ajuste conforme seu projeto)
+          echo "🔧 Criando pacote: ${ZIPNAME}"
+          # cria zip ignorando .git e node_modules
           zip -r "${ZIPNAME}" . -x ".git/*" "node_modules/*"
           echo "ZIP=${ZIPNAME}" >> $GITHUB_OUTPUT
 
@@ -39,6 +41,7 @@ jobs:
       - name: Upload release asset
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{ steps.make_zip.outputs.ZIP }}
+          # usa o nome do arquivo zip criado no passo anterior
+          files: release-${{ github.ref_name }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
