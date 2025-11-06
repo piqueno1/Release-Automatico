@@ -1,0 +1,42 @@
+name: Create Release on Tag
+
+on:
+  push:
+    tags:
+      - 'v*'   # roda quando uma tag começando com v for pushada
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Create release zip
+        id: make_zip
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          ZIPNAME="release-${TAG}.zip"
+          # cria zip ignorando pasta .git e node_modules (ajuste conforme seu projeto)
+          zip -r "${ZIPNAME}" . -x ".git/*" "node_modules/*"
+          echo "ZIP=${ZIPNAME}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: ${{ github.ref_name }}
+          body: "Release automatically created by workflow for ${{ github.ref_name }}"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ steps.make_zip.outputs.ZIP }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
