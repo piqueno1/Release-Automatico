@@ -1,59 +1,87 @@
+# Nome do workflow que aparece na aba "Actions" do GitHub
 name: Manual Release Package
 
+# Definição de quando o workflow é disparado
 on:
+  # workflow_dispatch = disparo manual (botão "Run workflow" no GitHub)
   workflow_dispatch:
     inputs:
+      # Input que o usuário vai informar ao rodar manualmente
       version:
         description: 'Versão/tag a ser usada (ex: v1.2.0)'
-        required: true
-        default: 'v1.0.0'
+        required: true               # Campo obrigatório
+        default: 'v1.0.0'            # Valor padrão se o usuário não trocar
 
+# Permissões que o workflow tem no repositório
 permissions:
-  contents: write   # permite criar/atualizar releases e enviar assets
+  contents: write   # precisa de write pra criar/atualizar release e subir assets
 
 jobs:
+  # Nome do job
   release:
+    # Ambiente onde o job vai rodar
     runs-on: ubuntu-latest
 
     steps:
+      # 1) Baixar o código do repositório
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0   # baixa todo o histórico de commits (necessário pra tags, etc.)
 
+      # 2) Criar a tag se ela ainda não existir
       - name: Create tag if not exists
         run: |
+          # Lê o input "version" passado no disparo manual
           TAG="${{ github.event.inputs.version }}"
           echo "🔍 Verificando se a tag ${TAG} existe..."
+          
+          # git rev-parse TAG verifica se a tag existe
+          # >/dev/null 2>&1 = descarta qualquer saída (stdout e stderr)
           if ! git rev-parse "$TAG" >/dev/null 2>&1; then
             echo "🔖 Criando tag ${TAG}..."
+            # Configura o usuário do git para o commit/tag que será criado pela Action
             git config user.name "github-actions"
             git config user.email "github-actions@github.com"
+            # Cria a tag anotada (-a) com mensagem (-m)
             git tag -a "$TAG" -m "Tag criada automaticamente para release"
+            # Envia a tag para o repositório remoto (origin)
             git push origin "$TAG"
           else
+            # Se já existir, só informa
             echo "✅ Tag ${TAG} já existe."
           fi
 
+      # 3) Criar o arquivo ZIP do repositório para anexar na release
       - name: Create release zip
-        id: make_zip
+        id: make_zip          # id do step (permite referenciar outputs, se quiser)
         run: |
           TAG="${{ github.event.inputs.version }}"
           ZIPNAME="repo-${TAG}.zip"
           echo "📦 Criando pacote ${ZIPNAME}..."
+          # zip -r compacta recursivamente todo o repo
+          # -x exclui os diretórios .git e .github do zip
           zip -r "${ZIPNAME}" . -x ".git/*" ".github/*"
+          # Salva o nome do zip em uma saída do step (GITHUB_OUTPUT)
           echo "ZIP=${ZIPNAME}" >> $GITHUB_OUTPUT
+          # Lista o arquivo gerado com tamanho legível (ls -lh)
           ls -lh "${ZIPNAME}"
 
+      # 4) Criar ou atualizar a release e enviar o ZIP como asset
       - name: Create or update release and upload asset
+        # Action pronta para criar releases no GitHub
         uses: softprops/action-gh-release@v1
         with:
-          # Tag a ser usada (cria release se não existir, atualiza se existir)
+          # Tag usada na release (cria se não existir, atualiza se existir)
           tag_name: ${{ github.event.inputs.version }}
+          # Nome “bonito” da release
           name: "Release ${{ github.event.inputs.version }}"
-          body: "Release automático contendo o pacote completo do repositório (${{
-            github.event.inputs.version }})."
+          # Descrição da release
+          body: "Release automático contendo o pacote completo do repositório (${{github.event.inputs.version }})."
+          # Arquivo que será anexado na release (asset)
           files: repo-${{ github.event.inputs.version }}.zip
+          # Se o arquivo não existir por algum motivo, não falha o workflow
           fail_on_unmatched_files: false
         env:
+          # Token padrão que o GitHub Actions injeta, usado para autenticar
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
