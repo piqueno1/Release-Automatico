@@ -1,42 +1,56 @@
+# Nome do workflow que aparece na aba "Actions"
 name: Deploy to GitHub Pages
 
+# Quando o workflow é disparado
 on:
   push:
     branches:
-      - main   # roda quando fizer push na branch main
+      - main   # roda sempre que der push na branch main
 
+# Permissões que esse workflow vai ter no repositório
 permissions:
-  contents: read
-  pages: write      # necessário para publicar no Pages
-  id-token: write   # necessário para autenticação
+  contents: read      # pode ler conteúdo do repositório
+  pages: write        # pode publicar/atualizar o GitHub Pages
+  id-token: write     # usado para autenticação OIDC pelo GitHub Pages
 
 jobs:
+  # Primeiro job: responsável por "preparar" os arquivos (build + upload)
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest   # máquina virtual Linux onde o job roda
+
     steps:
+      # 1) Baixar o código do repositório nessa VM
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Se seu projeto for só HTML/CSS/JS puro, não precisa de build extra.
-      # Mas se tiver build (React, Vue, etc.), colocamos aqui.
+      # Se o projeto tiver build (React, Vue, etc.), os comandos de build entrariam aqui.
+      # Como o comentário diz, para HTML/CSS/JS puro, não é necessário.
 
+      # 2) Configurar o ambiente para GitHub Pages
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
+      # 3) Enviar os arquivos que serão publicados como "artifact" de Pages
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .   # publica tudo que está na raiz (onde está seu index.html)
+          # path = pasta a ser publicada.
+          # Aqui é "." (raiz do repo), onde estaria o index.html
+          path: .
 
+  # Segundo job: responsável por de fato publicar os arquivos no Pages
   deploy:
     environment:
       name: github-pages
+      # URL final do site, gerada pela action de deploy (output "page_url")
       url: ${{ steps.deployment.outputs.page_url }}
 
     runs-on: ubuntu-latest
+    # Só roda depois que o job "build" terminar com sucesso
     needs: build
 
     steps:
+      # 4) Faz o deploy do artifact enviado no job anterior para o GitHub Pages
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
